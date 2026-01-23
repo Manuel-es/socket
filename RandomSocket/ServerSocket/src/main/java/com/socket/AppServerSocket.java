@@ -21,6 +21,7 @@ public class AppServerSocket
     {
     	//Generar número
     	numGen = (new Random()).nextInt(10)+1;
+    	System.out.println("DEBUG - El número secreto es: " + numGen);
     	
     	try {
     		ServerSocket srvSock = new ServerSocket(PORT);
