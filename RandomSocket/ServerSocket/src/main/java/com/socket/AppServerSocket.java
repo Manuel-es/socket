@@ -66,6 +66,9 @@ public class AppServerSocket
 			System.out.println("IP:" + clientIP + ", HostName: "+ hostName);
 	}
 	private static String checkNumero(String datoRec) {
+		if (datoRec.trim().equalsIgnoreCase("SALIR")) {
+	        return "Adios";
+	    }
 		try {
 			int numero = Integer.parseInt(datoRec);
 			
