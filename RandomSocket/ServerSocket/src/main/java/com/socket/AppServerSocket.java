@@ -40,27 +40,20 @@ public class AppServerSocket
         
             String datoRec, datoEnv;
             
-            // --- NUEVO: Inicializamos el contador de intentos ---
             int intentos = 0;
             
-            // leeremos todos los mensajes recibidos
             while((datoRec = entrada.readLine()) != null) {
   
-                // --- NUEVO: Sumamos 1 intento cada vez que recibimos un mensaje
                 intentos++;
 
-                // Comprobamos el número (o si es SALIR)
                 datoEnv = checkNumero(datoRec);
                 
-                // --- NUEVO: Añadimos el contador al mensaje (si no es un mensaje de despedida)
                 if (!datoEnv.equals("Adios")) {
                     datoEnv = "[Intento " + intentos + "] " + datoEnv;
                 }
                 
-                // Retornamos al cliente el resultado 
                 salida.println(datoEnv);
                 
-                // Si el cliente mandó salir, avisamos en el log del servidor
                 if (datoRec.trim().equalsIgnoreCase("SALIR")) {
                     System.out.println("Cliente desconectado.");
                 }
