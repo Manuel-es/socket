@@ -12,13 +12,16 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * Servidor TCP con diseño original + MEJORA 1 (Ruta /nombre/).
+ * Servidor FINAL con:
+ * - Mejora 1: Ruta dinámica /nombre/
+ * - Mejora 2: Diseño CSS (Card)
+ * - Mejora 3: Control de Error 404
  */
 public class HiloPorClienteServidor implements Runnable {
 
     protected int serverPort = 9001;
     protected ServerSocket serversocket = null;
-    protected boolean isStopped;
+    protected boolean isStopped = false;
     protected Thread runningThread = null;
 
     public HiloPorClienteServidor(int serverPort) {
@@ -30,14 +33,11 @@ public class HiloPorClienteServidor implements Runnable {
         synchronized (this) {
             this.runningThread = Thread.currentThread();
         }
-
         openServerSocket();
 
         while (!isStopped()) {
             try {
                 Socket clientSocket = this.serversocket.accept();
-
-                // Creamos un hilo nuevo por cada cliente
                 new Thread(() -> {
                     try {
                         processClientRequest(clientSocket);
@@ -63,7 +63,6 @@ public class HiloPorClienteServidor implements Runnable {
              BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.US_ASCII));
              OutputStream out = clientSocket.getOutputStream()) {
 
-            // 1) Leer la primera línea
             String requestLine = br.readLine();
             if (requestLine == null || requestLine.isBlank()) return;
 
@@ -75,47 +74,78 @@ public class HiloPorClienteServidor implements Runnable {
                     path = requestLine.substring(start, end);
             }
 
-            // 2) Favicon
             if ("/favicon.ico".equals(path)) {
                 serveFavicon(out);
                 return;
             }
 
-            // 3) Datos del cliente
-            String clientIp = clientSocket.getInetAddress().getHostAddress();
-            int clientPort = clientSocket.getPort(); 
-            String remote = clientSocket.getRemoteSocketAddress().toString(); 
-
+            // Datos técnicos
             long time = System.currentTimeMillis();
-            String fecha = new SimpleDateFormat("dd/MM/yy HH:mm:ss").format(new Date(time));
+            String fecha = new SimpleDateFormat("HH:mm:ss dd/MM/yyyy").format(new Date(time));
 
-           
-            String mensajeTitulo = "<h3 style='color:blue;'>Servidor OK</h3>";
+            // --- VARIABLES PARA LA RESPUESTA ---
+            String status = "200 OK"; // Estado por defecto (se cambiará si hay error)
+            String titulo = "Servidor Web Java";
+            String mensajePrincipal = "Bienvenido al servidor concurrente.";
+            String subtitulo = "Ruta actual: " + path;
+            String colorFondo = "coral"; // Color por defecto
+
+            // --- LÓGICA DE RUTAS (Mejoras 1, 2 y 3) ---
+
+            if (path.equals("/")) {
+                // Caso Inicio
+                titulo = "Página de Inicio";
+                mensajePrincipal = "Usa la ruta /nombre/TuNombre para probar.";
             
-            if (path.startsWith("/nombre/")) {
-                String nombre = path.substring(8); 
-                mensajeTitulo = "<h1 style='color:blue;'>Hola " + nombre + "</h1>";
+            } else if (path.startsWith("/nombre/")) {
+                // MEJORA 1: Ruta dinámica
+                String nombre = path.substring(8);
+                titulo = "¡Hola " + nombre + "!";
+                mensajePrincipal = "Saludo generado dinámicamente.";
+                subtitulo = "Conexión correcta";
+            
+            } else {
+                // MEJORA 3: ERROR 404 (Si no es ni Inicio ni Nombre)
+                status = "404 Not Found";
+                titulo = "Error 404";
+                mensajePrincipal = "<span style='color:red; font-weight:bold;'>¡Página no encontrada!</span>";
+                subtitulo = "La ruta '" + path + "' no existe en este servidor.";
+                colorFondo = "#444"; // Cambiamos el fondo a gris oscuro para dar miedo
             }
-           
+
+            // --- CSS (Mejora 2) ---
+            String css = "body { font-family: 'Segoe UI', sans-serif; "
+                       + "background-color: " + colorFondo + "; margin: 0; display: flex; justify-content: center; "
+                       + "align-items: center; height: 100vh; transition: background 0.5s; }"
+                       + ".card { background: white; padding: 40px; border-radius: 15px; "
+                       + "box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; width: 400px; }"
+                       + "h1 { color: #333; margin-bottom: 10px; }"
+                       + "p { color: #666; line-height: 1.6; }"
+                       + ".tag { display: inline-block; background: #eee; color: #555; "
+                       + "padding: 5px 10px; border-radius: 5px; font-size: 0.8em; margin-top: 15px; }";
+
             String body = "<html>"
                     + "<head>"
-                    + "<link rel='icon' href='/favicon.ico'>"
-                    + "<title>Programación de Servicios y Procesos</title>"
+                    + "<meta charset='UTF-8'>"
+                    + "<title>" + titulo + "</title>"
+                    + "<style>" + css + "</style>"
                     + "</head>"
-                    + "<body style='background-color: coral;'>"  
-                    + mensajeTitulo                             
-                    + "<p>Path: " + path + "</p>"
-                    + "<p>Server: " + fecha + "</p>"
-                    + "<p>Hilo: " + Thread.currentThread().getName() + "</p>"
-                    + "<p>Cliente IP: " + clientIp + "</p>"
-                    + "<p>Cliente puerto: " + clientPort + "</p>"
-                    + "<p>Remote: " + remote + "</p>"
+                    + "<body>"
+                    + "  <div class='card'>"
+                    + "    <h1>" + titulo + "</h1>"
+                    + "    <p>" + mensajePrincipal + "</p>"
+                    + "    <p><em>" + subtitulo + "</em></p>"
+                    + "    <div class='tag'>Hilo: " + Thread.currentThread().getName() + "</div><br>"
+                    + "    <small style='color:#ccc; display:block; margin-top:20px;'>Hora: " + fecha + "</small>"
+                    + "    <br><a href='/'>Volver al inicio</a>"
+                    + "  </div>"
                     + "</body></html>";
 
             byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
 
+            // --- CABECERAS HTTP (Usando la variable status) ---
             String headers =
-                    "HTTP/1.1 200 OK\r\n" +
+                    "HTTP/1.1 " + status + "\r\n" +  // <--- AQUÍ SE APLICA EL 200 O EL 404
                     "Content-Type: text/html; charset=UTF-8\r\n" +
                     "Content-Length: " + bodyBytes.length + "\r\n" +
                     "Connection: close\r\n" +
@@ -125,38 +155,24 @@ public class HiloPorClienteServidor implements Runnable {
             out.write(bodyBytes);
             out.flush();
 
-            
-            System.out.println("[" + Thread.currentThread().getName() + "] " + requestLine);
+            System.out.println("[" + Thread.currentThread().getName() + "] " + path + " -> " + status);
         }
     }
 
     private void serveFavicon(OutputStream out) throws IOException {
         try (InputStream iconStream = HiloPorClienteServidor.class.getResourceAsStream("/favicon.ico")) {
-
             if (iconStream == null) {
                 out.write(("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
-                out.flush();
                 return;
             }
-
             byte[] iconBytes = iconStream.readAllBytes();
-
-            String headers =
-                    "HTTP/1.1 200 OK\r\n" +
-                    "Content-Type: image/x-icon\r\n" +
-                    "Content-Length: " + iconBytes.length + "\r\n" +
-                    "Connection: close\r\n" +
-                    "\r\n";
-
+            String headers = "HTTP/1.1 200 OK\r\nContent-Type: image/x-icon\r\nContent-Length: " + iconBytes.length + "\r\n\r\n";
             out.write(headers.getBytes(StandardCharsets.US_ASCII));
             out.write(iconBytes);
-            out.flush();
         }
     }
 
-    private synchronized boolean isStopped() {
-        return isStopped;
-    }
+    private synchronized boolean isStopped() { return isStopped; }
 
     private void openServerSocket() {
         try {
@@ -169,9 +185,7 @@ public class HiloPorClienteServidor implements Runnable {
     public synchronized void stop() {
         this.isStopped = true;
         try {
-            if (this.serversocket != null) {
-                this.serversocket.close();
-            }
+            if (this.serversocket != null) this.serversocket.close();
         } catch (IOException e) {
             System.err.println(e);
         }
